@@ -1,3 +1,4 @@
+# prometheus
 
 Helper script for creating IAM User accounts
 
@@ -9,4 +10,3 @@ Examples:
     Add user to multiple groups
 
         $ python prometheus.py -u foo -g bar -g baz
-
