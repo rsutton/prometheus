@@ -1,4 +1,4 @@
-"""
+
 Helper script for creating IAM User accounts
 
 Examples:
@@ -10,4 +10,3 @@ Examples:
 
         $ python prometheus.py -u foo -g bar -g baz
 
-"""
