@@ -2,15 +2,16 @@
 
 Helper script for managing IAM User accounts
 
-Examples:
-    Create user account, add user to a group and create an AccessKey
+## Examples:
+
+Create user account, add user to a group and create an AccessKey
 
         $ python prometheus -u foo -g bar -k
 
-    Add user to multiple groups
+Add user to multiple groups
 
         $ python prometheus -u foo -g bar -g baz
 
-    Delete user account
+Delete user account
 
         $ python prometheus -u foo --delete
