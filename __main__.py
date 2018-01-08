@@ -153,7 +153,7 @@ if __name__ == '__main__':
 
     if parser.list:
         _, users = get_users()
-        list(map(print,users))
+        print(*users, sep='\n')
         sys.exit(0)
 
     if user_exists(name):
