@@ -73,6 +73,20 @@ def get_user(user_name):
     return err, result
 
 
+def get_users():
+    err, result = None, []
+    try:
+        paginator = iam.get_paginator('list_users')
+        page_iter = paginator.paginate()
+
+        for p in page_iter:
+            for u in p.get('Users'):
+                result.append(u.get('UserName'))
+    except Exception as e:
+        err = str(e)
+    return err, result
+
+
 def user_exists(user_name):
     err, result = get_user(user_name)
     return True if len(result) != 0 else False
@@ -121,7 +135,8 @@ def print_dict(dict_obj):
 def parse_args(args):
     p = argparse.ArgumentParser(description="Prometheus: IAM User Creator")
     p.add_argument('--delete', dest='delete', action='store_true', help='Delete User')
-    p.add_argument('-u', dest='username', required=True, help='IAM User name')
+    p.add_argument('--list', dest='list', action='store_true', help='List all users')
+    p.add_argument('-u', dest='username', required='--list' not in sys.argv, help='IAM User name')
     p.add_argument('-g', dest='group', action='append', help='Use multiple -g for multiple Groups')
     p.add_argument('-k', dest='with_key', action='store_true', help='Create Access Key')
     return p.parse_args(args)
@@ -134,6 +149,11 @@ if __name__ == '__main__':
 
     if parser.delete:
         delete_user(name)
+        sys.exit(0)
+
+    if parser.list:
+        _, users = get_users()
+        list(map(print,users))
         sys.exit(0)
 
     if user_exists(name):
