@@ -1,8 +1,27 @@
 import argparse
 import boto3
+import json
 import sys
 
 iam = boto3.client('iam')
+
+
+class User(object):
+    def __init__(self, user_name):
+        self.user_name = user_name
+        self.password_last_used = None
+        self.access_keys = []
+        self.keys_last_used = {}
+        self.initialize()
+
+    def initialize(self):
+        _, self.access_keys = get_user_access_keys(self.user_name)
+        for k in self.access_keys:
+            _, d = get_access_key_last_used(k)
+            self.keys_last_used[k] = str(d)
+
+    def __repr__(self):
+        return json.dumps(self.__dict__)
 
 
 def get_group(group_name):
@@ -63,6 +82,52 @@ def get_user_access_keys(user_name):
     return err, result
 
 
+def get_access_key_last_used(key_id):
+    err, result = None, {}
+    try:
+        response = iam.get_access_key_last_used(AccessKeyId=key_id)
+        result = response.get('AccessKeyLastUsed')
+    except Exception as e:
+        err = str(e)
+    return err, result
+
+
+def get_user_password_last_used(user_name):
+    _, u = get_user(user_name)
+    return u.get('PasswordLastUsed')
+
+
+def has_login_profile(user_name):
+    result = False
+    try:
+        response = iam.get_login_profile(UserName=user_name)
+        result = 'LoginProfile' in response
+    except iam.exceptions.NoSuchEntityException:
+        pass
+    return result
+
+
+def get_inline_user_policies(user_name):
+    err, result = 0, []
+    try:
+        response = iam.list_user_policies(UserName=user_name)
+        result = response.get('PolicyNames')
+    except Exception as e:
+        err = str(e)
+    return err, result
+
+
+def get_attached_user_policies(user_name):
+    err, result = 0, []
+    try:
+        response = iam.list_attached_user_policies(UserName=user_name)
+        for p in response.get('AttachedPolicies'):
+            result.append(p.get('PolicyArn'))
+    except Exception as e:
+        err = str(e)
+    return err, result
+
+
 def get_user(user_name):
     err, result = None, {}
     try:
@@ -81,7 +146,8 @@ def get_users():
 
         for p in page_iter:
             for u in p.get('Users'):
-                result.append(u.get('UserName'))
+                record = User(u.get('UserName'))
+                print(record)
     except Exception as e:
         err = str(e)
     return err, result
@@ -123,6 +189,14 @@ def delete_user(user_name):
     for k in user_keys:
         print("Deleting AccessKey: {}".format(k))
         iam.delete_access_key(UserName=user_name, AccessKeyId=k)
+    if has_login_profile(user_name):
+        iam.delete_login_profile(UserName=user_name)
+    _, managed_policies = get_attached_user_policies(user_name)
+    for p in managed_policies:
+        iam.detach_user_policy(UserName=user_name, PolicyArn=p)
+    _, inline_policies = get_inline_user_policies(user_name)
+    for p in inline_policies:
+        iam.delete_user_policy(UserName=user_name, PolicyName=p)
     iam.delete_user(UserName=user_name)
     print("{} deleted.".format(user_name))
 
@@ -152,8 +226,8 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if parser.list:
-        _, users = get_users()
-        print(*users, sep='\n')
+        get_users()
+        # print(*users, sep='\n')
         sys.exit(0)
 
     if user_exists(name):
