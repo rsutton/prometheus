@@ -1,17 +1,24 @@
 import boto3
-import json
 from prometheus.lib.decorators import boto3_client
+from prometheus.lib.user_record import UserRecordManager
 
 
 class IAMManager(object):
     def __init__(self):
         self._client = None
+        self._record_manager = None
 
     @property
     def client(self):
         if self._client is None:
             self._client = boto3.client('iam')
         return self._client
+
+    @property
+    def record_manager(self):
+        if self._record_manager is None:
+            self._record_manager = UserRecordManager()
+        return self._record_manager
 
     @boto3_client()
     def get_user(self, user_name):
@@ -49,59 +56,53 @@ class IAMManager(object):
         print(response.get('AccessKey'))
 
     @boto3_client()
-    def get_user_groups(self, user_name):
-        result = []
-        response = self.client.list_groups_for_user(UserName=user_name)
-        for g in response.get('Groups'):
-            result.append(g.get('GroupName'))
-        return result
+    def remove_user_from_groups(self, record):
+        for g in record.user_groups:
+            self.client.remove_user_from_group(GroupName=g, UserName=record.user_name)
 
     @boto3_client()
-    def remove_user_from_groups(self, user_name):
-        for g in self.get_user_groups(user_name):
-            self.client.remove_user_from_group(GroupName=g, UserName=user_name)
-
-    @boto3_client()
-    def delete_user_keys(self, user_name):
-        response = self.client.list_access_keys(UserName=user_name)
-        for key in response.get('AccessKeyMetadata'):
-            key_id = key.get('AccessKeyId')
+    def delete_user_keys(self, record):
+        for key_id in record.access_keys.keys():
             print("Deleting AccessKey: {}".format(key_id))
-            self.client.delete_access_key(UserName=user_name, AccessKeyId=key_id)
+            self.client.delete_access_key(UserName=record.user_name, AccessKeyId=key_id)
 
     @boto3_client()
-    def delete_login_profile(self, user_name):
-        response = self.client.get_login_profile(UserName=user_name)
-        if 'LoginProfile' in response:
-            print("Deleting Login Profile")
-            self.client.delete_login_profile(UserName=user_name)
+    def delete_login_profile(self, record):
+        if record.login_profile:
+            self.client.delete_login_profile(UserName=record.user_name)
 
     @boto3_client()
-    def detach_managed_policies(self, user_name):
-        response = self.client.list_attached_user_policies(UserName=user_name)
-        for p in response.get('AttachedPolicies'):
-            policy = p.get('PolicyArn')
-            print("Detaching Managed Policy {}".format(policy))
-            self.client.detach_user_policy(UserName=user_name, PolicyArn=policy)
+    def detach_managed_policies(self, record):
+        for p in record.attached_policies:
+            print("Detaching Managed Policy {}".format(p))
+            self.client.detach_user_policy(UserName=record.user_name, PolicyArn=p)
 
     @boto3_client()
-    def delete_inline_policies(self, user_name):
-        response = self.client.list_user_policies(UserName=user_name)
-        for p in response.get('PolicyNames'):
+    def delete_inline_policies(self, record):
+        for p in record.inline_policies:
             print("Deleting Inline Policy {}".format(p))
-            self.client.delete_user_policy(UserName=user_name, PolicyName=p)
+            self.client.delete_user_policy(UserName=record.user_name, PolicyName=p)
+
+    @boto3_client()
+    def delete_mfa_devices(self, record):
+        for d in record.mfa_devices:
+            self.client.deactivate_mfa_device(UserName=record.user_name, SerialNumber=d)
+            self.client.delete_virtual_mfa_device(SerialNumber=d)
 
     def delete_user(self, user_name):
-        if not self.user_exists(user_name):
+        r = self.record_manager.create_user_record(user_name)
+
+        if not r.user_id:
             print("Delete cancelled! User does not exist: {}".format(user_name))
             return
-        print("Deleting User Account: {}".format(user_name))
 
-        self.delete_user_keys(user_name)
-        self.remove_user_from_groups(user_name)
-        self.delete_login_profile(user_name)
-        self.delete_inline_policies(user_name)
-        self.detach_managed_policies(user_name)
+        print("Deleting User Account: {}".format(user_name))
+        self.delete_user_keys(r)
+        self.remove_user_from_groups(r)
+        self.delete_login_profile(r)
+        self.delete_inline_policies(r)
+        self.detach_managed_policies(r)
+        self.delete_mfa_devices(r)
 
         self.client.delete_user(UserName=user_name)
         print("... {} deleted.".format(user_name))
@@ -113,4 +114,4 @@ class IAMManager(object):
 
         for p in page_iter:
             for u in p.get('Users'):
-                print(json.dumps(u, default=str))
+                yield u

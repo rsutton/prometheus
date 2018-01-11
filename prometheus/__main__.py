@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 
 from prometheus.lib.iam_manager import IAMManager
@@ -36,7 +37,8 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if parser.list:
-        iam.list_users()
+        for u in iam.list_users():
+            print(json.dumps(u, default=str))
         sys.exit(0)
 
     # create user
