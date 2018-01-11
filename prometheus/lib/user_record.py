@@ -141,3 +141,18 @@ class UserRecord(object):
     @property
     def user_name(self):
         return self._user_name
+
+    @property
+    def last_activity(self):
+        events = list()
+        events.append(self._iam_data.get('CreateDate'))
+        d = self.password_last_used
+        if d:
+            events.append(self.password_last_used)
+        for k in self.access_keys:
+            d = self.access_keys.get(k).get('LastUsedDate')
+            if d:
+                events.append(d)
+        events = sorted(events, reverse=True)
+        return events[0]
+

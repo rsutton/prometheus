@@ -40,9 +40,18 @@ class IAMManager(object):
         """
         if self.user_exists(user_name):
             print("User already exists.".format(user_name))
+            return False
         else:
             response = self.client.create_user(UserName=user_name)
             print("Created user: {}".format(response.get('User')))
+            return True
+
+    @boto3_client()
+    def get_user_groups(self, record):
+        result = []
+        response = self.client.list_groups_for_user(UserName=record.user_name)
+        for g in response.get('Groups'):
+            result.append(g.get('GroupName'))
 
     @boto3_client()
     def add_user_to_group(self, user_name, group_name):
@@ -94,7 +103,7 @@ class IAMManager(object):
 
         if not r.user_id:
             print("Delete cancelled! User does not exist: {}".format(user_name))
-            return
+            return False
 
         print("Deleting User Account: {}".format(user_name))
         self.delete_user_keys(r)
@@ -106,6 +115,7 @@ class IAMManager(object):
 
         self.client.delete_user(UserName=user_name)
         print("... {} deleted.".format(user_name))
+        return True
 
     @boto3_client()
     def list_users(self):
@@ -115,3 +125,4 @@ class IAMManager(object):
         for p in page_iter:
             for u in p.get('Users'):
                 yield u
+
