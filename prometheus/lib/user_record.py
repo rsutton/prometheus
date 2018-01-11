@@ -1,18 +1,24 @@
 import boto3
 import botocore.client
-
 import json
+
 from prometheus.lib.decorators import boto3_client
 
 
 class UserRecordManager(object):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self._client = None
+        self._filename = kwargs.get('filename') or 'prometheus.db'
 
     def with_client(self, client):
         assert isinstance(client, botocore.client.BaseClient)
         self._client = client
         return self
+
+    def with_file(self, filename):
+        self._filename = filename
+        return self
+
 
     @property
     def client(self):
@@ -31,6 +37,10 @@ class UserRecordManager(object):
             self._set_attached_policies(record)
             self._set_mfa_devices(record)
         return record
+
+    @property
+    def filename(self):
+        return self._filename
 
     @boto3_client()
     def _set_iam_data(self, record):
@@ -83,6 +93,7 @@ class UserRecordManager(object):
         response = self.client.list_mfa_devices(UserName=record.user_name)
         for m in response.get('MFADevices'):
             record._mfa_devices.append(m.get('SerialNumber'))
+
 
 class UserRecord(object):
     def __init__(self, user_name):
@@ -155,4 +166,3 @@ class UserRecord(object):
                 events.append(d)
         events = sorted(events, reverse=True)
         return events[0]
-
