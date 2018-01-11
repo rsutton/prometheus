@@ -6,12 +6,16 @@ Helper module for managing IAM User accounts
 
 Create user account, add user to a group and create an AccessKey
 
-        $ python -m prometheus -u foo -g bar -k
+        $ python -m prometheus --create -u foo -g bar -k
 
 Add user to multiple groups
 
-        $ python -m prometheus -u foo -g bar -g baz
+        $ python -m prometheus --create -u foo -g bar -g baz
 
-Delete user account
+Delete an account
 
-        $ python -m prometheus -u foo --delete
+        $ python -m prometheus --delete -u foo
+
+Disable an account - removes the account's login profile and deactivates all AccessKeys
+
+        $ python -m prometheus --disable -u foo
