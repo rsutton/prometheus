@@ -10,7 +10,8 @@ import prometheus._version as version
 
 def parse_args(args):
     p = argparse.ArgumentParser(description="Prometheus: IAM User Creator")
-    p.add_argument('--delete', dest='delete', action='store_true', help='Delete User')
+    p.add_argument('--delete', dest='delete', action='store_true', help='Delete User Account')
+    p.add_argument('--disable', dest='disable', action='store_true', help='Disable User Account')
     p.add_argument('--list', dest='list', action='store_true', help='List all users')
     p.add_argument('--report', dest='report', action='store_true', help='List accounts inactive more than 90 days')
     p.add_argument('-u', dest='username', help='IAM User name')
@@ -26,7 +27,7 @@ if __name__ == '__main__':
     groups = parser.group
 
     # name required if --delete, -g, or -k are specified
-    if not name and (parser.delete or parser.group or parser.with_key):
+    if not name and (parser.delete or parser.disable or parser.group or parser.with_key):
         raise argparse.ArgumentError('-u is required')
 
     if parser.version:
@@ -37,6 +38,10 @@ if __name__ == '__main__':
 
     if parser.delete:
         iam.delete_user(name)
+        sys.exit(0)
+
+    if parser.disable:
+        iam.disable_user(name)
         sys.exit(0)
 
     if parser.list:
@@ -51,7 +56,6 @@ if __name__ == '__main__':
             delta = date.today() - r.last_activity.date()
             if delta.days > 90:
                 print("{}: {}".format(r.user_name, delta.days))
-
 
     # create user
     iam.create_user(name)

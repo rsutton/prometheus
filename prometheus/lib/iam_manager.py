@@ -70,6 +70,11 @@ class IAMManager(object):
             self.client.remove_user_from_group(GroupName=g, UserName=record.user_name)
 
     @boto3_client()
+    def deactivate_user_keys(self, record):
+        for key_id in record.access_keys.keys():
+            self.client.update_access_key(UserName=record.user_name, AccessKeyId=key_id, Status='Inactive')
+
+    @boto3_client()
     def delete_user_keys(self, record):
         for key_id in record.access_keys.keys():
             print("Deleting AccessKey: {}".format(key_id))
@@ -116,6 +121,18 @@ class IAMManager(object):
         self.client.delete_user(UserName=user_name)
         print("... {} deleted.".format(user_name))
         return True
+
+    def disable_user(self, user_name):
+        r = self.record_manager.create_user_record(user_name)
+
+        if not r.user_id:
+            print("Delete cancelled! User does not exist: {}".format(user_name))
+            return False
+
+        print("Disabling User Account: {}".format(user_name))
+        self.deactivate_user_keys(r)
+        self.delete_login_profile(r)
+        print("... {} disabled.".format(user_name))
 
     @boto3_client()
     def list_users(self):
