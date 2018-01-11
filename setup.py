@@ -15,7 +15,7 @@ setup(
     packages=find_packages(exclude=['tests*']),
     package_data={'': ['templates/*']},
 
-    install_requires=['boto3'],
+    install_requires=['boto3', 'botocore'],
     test_suite='nose.collector',
     tests_require=['nose', 'mock'],
 
