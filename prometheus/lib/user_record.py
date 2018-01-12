@@ -1,49 +1,87 @@
-import boto3
-import botocore.client
 import json
-
-from prometheus.lib.decorators import boto3_client
+import os.path
+import pickle
+from prometheus.lib.iam_manager import IAMManager
+from prometheus.lib.utils import file_age
 
 
 class UserRecordManager(object):
     def __init__(self, *args, **kwargs):
         self._client = None
-        self._filename = kwargs.get('filename') or 'prometheus.db'
-
-    def with_client(self, client):
-        assert isinstance(client, botocore.client.BaseClient)
-        self._client = client
-        return self
+        self._filename = kwargs.get('filename') or 'data.db'
+        self._iam = None
+        self._records = {}
 
     def with_file(self, filename):
         self._filename = filename
+        self.load_data()
         return self
 
-
-    @property
-    def client(self):
-        if self._client is None:
-            self._client = boto3.client('iam')
-        return self._client
-
-    def create_user_record(self, user_name):
-        record = UserRecord(user_name)
-        self._set_iam_data(record)
-        if record.user_id is not None:
-            self._set_user_access_keys(record)
-            self._set_user_groups(record)
-            self._set_login_profile(record)
-            self._set_inline_policies(record)
-            self._set_attached_policies(record)
-            self._set_mfa_devices(record)
-        return record
+    def with_iam(self, iam):
+        self._iam = iam
+        return self
 
     @property
     def filename(self):
         return self._filename
 
-    @boto3_client()
-    def _set_iam_data(self, record):
+    @property
+    def iam(self):
+        if self._iam is None:
+            self._iam = IAMManager()
+        return self._iam
+
+    @property
+    def records(self):
+        return self._records
+
+    def create_user_record(self, user_name, data):
+        record = UserRecord(user_name)
+        self._set_iam_data(record, data)
+        self._set_user_access_keys(record)
+        self._set_user_groups(record)
+        self._set_login_profile(record)
+        self._set_inline_policies(record)
+        self._set_attached_policies(record)
+        self._set_mfa_devices(record)
+        self.records[user_name] = record
+        return record
+
+    def delete_user_record(self, user_name):
+        r = dict(self.records)
+        del r[user_name]
+        self._records = r
+
+    def get_user_record(self, user_name):
+        return self._records.get(user_name)
+
+    def load_data(self):
+        if not os.path.exists(self.filename):
+            print("User record data file not found. Creating new file: {}".format(self.filename))
+            with open(self.filename, 'wb') as f:
+                for u in self.iam.list_users():
+                    n = u.get('UserName')
+                    print("Processing record: {}".format(n))
+                    r = self.create_user_record(n, u)
+                    self.save_user_record(r)
+
+        if file_age(self.filename) > 2:
+            print("Data file is more than 2 days old, consider refreshing.")
+
+        with open(self.filename, 'rb') as f:
+            while True:
+                try:
+                    r = pickle.load(f)
+                    assert isinstance(r, UserRecord)
+                    self.records[r.user_name] = r
+                except EOFError:
+                    break
+
+    def save_user_record(self, record):
+        with open(self.filename, 'ab') as f:
+            pickle.dump(record, f)
+
+    def _set_iam_data(self, record, data):
         """
         {
             Path: /,
@@ -54,45 +92,31 @@ class UserRecordManager(object):
             PasswordLastUsed: datetime
         }
         """
-        response = self.client.get_user(UserName=record.user_name)
-        record._iam_data = response.get('User')
+        record.iam_data = data
 
-    @boto3_client()
     def _set_login_profile(self, record):
-        response = self.client.get_login_profile(UserName=record.user_name)
-        record._login_profile = response.get('LoginProfile')
+        record.login_profile = self.iam.get_login_profile(record.user_name)
 
-    @boto3_client()
     def _set_attached_policies(self, record):
-        response = self.client.list_attached_user_policies(UserName=record.user_name)
-        for p in response.get('AttachedPolicies'):
-            record._attached_policies.append(p.get('PolicyArn'))
+        for p in self.iam.list_attached_policies(record.user_name):
+            record.attached_policies.append(p.get('PolicyArn'))
 
-    @boto3_client()
     def _set_inline_policies(self, record):
-        response = self.client.list_user_policies(UserName=record.user_name)
-        for p in response.get('PolicyNames'):
-            record._inline_policies.append(p)
+        for p in self.iam.list_user_policies(record.user_name):
+            record.inline_policies.append(p)
 
-    @boto3_client()
     def _set_user_access_keys(self, record):
-        response = self.client.list_access_keys(UserName=record.user_name)
-        for k in response.get('AccessKeyMetadata'):
+        for k in self.iam.list_access_keys(record.user_name):
             key_id = k.get('AccessKeyId')
-            d = self.client.get_access_key_last_used(AccessKeyId=key_id)
-            record._access_keys[key_id] = d.get('AccessKeyLastUsed')
+            record.access_keys[key_id] = self.iam.get_access_key_last_used(key_id)
 
-    @boto3_client()
     def _set_user_groups(self, record):
-        response = self.client.list_groups_for_user(UserName=record.user_name)
-        for g in response.get('Groups'):
-            record._groups.append(g.get('GroupName'))
+        for g in self.iam.list_groups_for_user(record.user_name):
+            record.groups.append(g.get('GroupName'))
 
-    @boto3_client()
     def _set_mfa_devices(self, record):
-        response = self.client.list_mfa_devices(UserName=record.user_name)
-        for m in response.get('MFADevices'):
-            record._mfa_devices.append(m.get('SerialNumber'))
+        for m in self.iam.list_mfa_devices(record.user_name):
+            record.mfa_devices.append(m.get('SerialNumber'))
 
 
 class UserRecord(object):
@@ -126,12 +150,28 @@ class UserRecord(object):
         return self._iam_data.get('CreateDate')
 
     @property
+    def groups(self):
+        return self._groups
+
+    @property
+    def iam_data(self):
+        return self._iam_data
+
+    @iam_data.setter
+    def iam_data(self, value):
+        self._iam_data = value
+
+    @property
     def inline_policies(self):
         return self._inline_policies
 
     @property
     def login_profile(self):
         return self._login_profile
+
+    @login_profile.setter
+    def login_profile(self, value):
+        self._login_profile = value
 
     @property
     def mfa_devices(self):
@@ -156,7 +196,7 @@ class UserRecord(object):
     @property
     def last_activity(self):
         events = list()
-        events.append(self._iam_data.get('CreateDate'))
+        events.append(self.iam_data.get('CreateDate'))
         d = self.password_last_used
         if d:
             events.append(self.password_last_used)

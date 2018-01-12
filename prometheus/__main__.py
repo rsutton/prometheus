@@ -1,93 +1,157 @@
 import argparse
-from datetime import datetime, date
-import json
-import pickle
+from datetime import date
+import os.path
+from shutil import copyfile
+
 import sys
 
 from prometheus.lib.iam_manager import IAMManager
-from prometheus.lib.user_record import UserRecordManager
-import prometheus._version as version
+from prometheus.lib.user_record import UserRecordManager, UserRecord
 
 
 def parse_args(args):
-    p = argparse.ArgumentParser(description="Prometheus: IAM User Creator")
-    p.add_argument('--create', dest='create', action='store_true', help='Create User Account')
-    p.add_argument('--delete', dest='delete', action='store_true', help='Delete User Account')
-    p.add_argument('--disable', dest='disable', action='store_true', help='Disable User Account')
-    p.add_argument('--init', dest='init', action='store_true', help='Initialize local data store')
-    p.add_argument('--list', dest='list', action='store_true', help='List all users')
-    p.add_argument('--report', dest='report', action='store_true', help='List accounts inactive more than 90 days')
-    p.add_argument('-u', dest='username', help='IAM User name')
-    p.add_argument('-g', dest='group', action='append', help='Use multiple -g for multiple Groups')
-    p.add_argument('-k', dest='with_key', action='store_true', help='Create Access Key')
-    p.add_argument('-v', '--version', action='store_true', help='Version')
+    p = argparse.ArgumentParser(prog='Prometheus', description='AWS IAM Helper')
+    subparsers = p.add_subparsers()
+
+    parser_create = subparsers.add_parser('create', help='Create IAM User Account')
+    parser_create.set_defaults(func=create)
+    parser_create.add_argument('-u', dest='username', required=True, help='IAM User name')
+    parser_create.add_argument('-g', dest='groups', action='append', help='Use multiple -g for multiple Groups')
+    parser_create.add_argument('-k', dest='with_key', action='store_true', help='Create Access Key')
+
+    parser_delete = subparsers.add_parser('delete', help='Delete IAM User Account')
+    parser_delete.set_defaults(func=delete)
+    parser_delete.add_argument('-u', dest='username', required=True, help='IAM User name')
+
+    parser_disable = subparsers.add_parser('disable', help='Disable IAM User Account')
+    parser_disable.set_defaults(func=disable)
+    parser_disable.add_argument('-u', dest='username', required=True, help='IAM User name')
+
+    parser_init = subparsers.add_parser('init', help='Initialize data file')
+    parser_init.set_defaults(func=init)
+
+    parser_list = subparsers.add_parser('list', help='List all IAM accounts')
+    parser_list.set_defaults(func=list_users)
+
+    parser_report = subparsers.add_parser('report', help='Aging Report')
+    parser_report.add_argument('-d', dest='days', required=True, help='Inactive more than -d days')
+    parser_report.set_defaults(func=report)
+
+    parser_version = subparsers.add_parser('version', help='Version')
+    parser_version.set_defaults(func=version)
+
     return p.parse_args(args)
+
+
+def create(args):
+    iam = IAMManager()
+    urm = UserRecordManager().with_iam(iam)
+    urm.load_data()
+
+    # create user in IAM
+    user_data = iam.create_user(args.username)
+
+    if args.with_key:
+        iam.create_access_key(args.username)
+
+    if args.groups is not None:
+        user_groups = iam.get_user_groups(args.username)
+        for g in args.groups:
+            if g in user_groups:
+                print("User is already a member of {}.".format(g))
+            else:
+                iam.add_user_to_group(args.username, g)
+
+    # create user record and add to data file
+    urm.create_user_record(args.username, user_data)
+
+
+def delete(args):
+    iam = IAMManager()
+    urm = UserRecordManager().with_iam(iam)
+    urm.load_data()
+
+    record = urm.records.get(args.username)
+    if record is None:
+        print("User account {} not found in data file".format(args.username))
+        print("Looking up account in IAM")
+        user_data = iam.get_user(args.username)
+        if not user_data:
+            print("Account not found in IAM. Aborting")
+        else:
+            record = urm.create_user_record(args.username, user_data)
+
+    assert isinstance(record, UserRecord)
+
+    print("Deleting User Account: {}".format(args.username))
+    iam.delete_user_keys(args.username, record.access_keys)
+    iam.remove_user_from_groups(args.username, record.groups)
+    iam.delete_login_profile(args.username)
+    iam.delete_inline_policies(args.username, record.inline_policies)
+    iam.detach_managed_policies(args.username, record.attached_policies)
+    iam.delete_mfa_devices(args.username, record.mfa_devices)
+    iam.delete_user(args.username)
+    urm.delete_user_record(args.username)
+    print("... {} deleted.".format(args.username))
+
+
+def disable(args):
+    iam = IAMManager()
+    urm = UserRecordManager().with_iam(iam)
+    urm.load_data()
+
+    record = urm.records.get(args.username)
+    if record is None:
+        print("User account {} not found in data file".format(args.username))
+        print("Looking up account in IAM")
+        user_data = iam.get_user(args.username)
+        if not user_data:
+            print("Account not found in IAM. Aborting")
+        else:
+            record = urm.create_user_record(args.username, user_data)
+
+    assert isinstance(record, UserRecord)
+
+    print("Disabling User Account: {}".format(args.username))
+    iam.deactivate_user_keys(args.username, record.access_keys)
+    iam.delete_login_profile(args.username)
+    print("... {} disabled.".format(args.username))
+
+
+def init(args):
+    urm = UserRecordManager()
+    urm.load_data()
+    if os.path.exists(urm.filename):
+        copyfile(urm.filename, "{}.bak".format(urm.filename))
+        os.remove(urm.filename)
+    urm.load_data()
+
+
+def list_users(args):
+    urm = UserRecordManager()
+    urm.load_data()
+    for k in urm.records.keys():
+        print(urm.records[k])
+
+
+def report(args):
+    urm = UserRecordManager()
+    urm.load_data()
+    for k in urm.records.keys():
+        r = urm.records[k]
+        # skip qtpi resources
+        if "test-App" in str(r.user_name) or "prod-App" in str(r.user_name):
+            continue
+        delta = date.today() - r.last_activity.date()
+        if delta.days > int(args.days):
+            print("{}: {}".format(r.user_name, delta.days))
+
+
+def version(args):
+    from prometheus._version import __version__
+    print("Prometheus version: {}".format(__version__))
 
 
 if __name__ == '__main__':
     parser = parse_args(sys.argv[1:])
-    name = parser.username
-    groups = parser.group
-
-    if parser.version:
-        print("Prometheus version: {}".format(version.__version__))
-        sys.exit(0)
-
-    iam = IAMManager()
-
-    if parser.create:
-        if not name:
-            raise argparse.ArgumentError('-u is required')
-
-        # create user
-        iam.create_user(name)
-
-        if parser.with_key:
-            iam.create_access_key(name)
-
-        if groups is not None:
-            user_groups = iam.get_user_groups(name)
-            for g in groups:
-                if g in user_groups:
-                    print("User is already a member of {}.".format(g))
-                else:
-                    iam.add_user_to_group(name, g)
-
-    elif parser.delete:
-        if not name:
-            raise argparse.ArgumentError('-u is required')
-        iam.delete_user(name)
-
-    elif parser.disable:
-        if not name:
-            raise argparse.ArgumentError('-u is required')
-        iam.disable_user(name)
-
-    elif parser.list:
-        for u in iam.list_users():
-            print(json.dumps(u, default=str))
-
-    elif parser.report:
-        m = UserRecordManager()
-        try:
-            with open(m.filename, 'rb') as f:
-                while True:
-                    try:
-                        r = pickle.load(f)
-                        # skip qtpi resources
-                        if "test-App" in str(r.user_name) or "prod-App" in str(r.user_name):
-                            continue
-                        delta = date.today() - r.last_activity.date()
-                        if delta.days > 90:
-                            print("{}: {}".format(r.user_name, delta.days))
-                    except EOFError:
-                        break
-        except FileNotFoundError as e:
-            print("Data file {} does not exist. Execute --update first".format(m.filename))
-
-    elif parser.init:
-        m = UserRecordManager()
-        with open(m.filename, 'wb') as f:
-            for u in iam.list_users():
-                r = m.create_user_record(u.get('UserName'))
-                pickle.dump(r, f)
+    parser.func(parser)
