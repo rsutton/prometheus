@@ -103,6 +103,7 @@ class IAMManager(object):
         response = self.client.list_groups_for_user(UserName=user_name)
         for g in response.get('Groups'):
             result.append(g.get('GroupName'))
+        return result
 
     @boto3_client()
     def list_access_keys(self, user_name):

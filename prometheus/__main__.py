@@ -63,7 +63,8 @@ def create(args):
                 iam.add_user_to_group(args.username, g)
 
     # create user record and add to data file
-    urm.create_user_record(args.username, user_data)
+    record = urm.create_user_record(args.username, user_data)
+    urm.save_user_record(record)
 
 
 def delete(args):
@@ -91,6 +92,7 @@ def delete(args):
     iam.detach_managed_policies(args.username, record.attached_policies)
     iam.delete_mfa_devices(args.username, record.mfa_devices)
     iam.delete_user(args.username)
+    # TODO - remove record from data file
     urm.delete_user_record(args.username)
     print("... {} deleted.".format(args.username))
 
