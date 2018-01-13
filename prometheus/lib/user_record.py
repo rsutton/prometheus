@@ -1,6 +1,8 @@
 import json
 import os.path
 import pickle
+import sys
+
 from prometheus.lib.iam_manager import IAMManager
 from prometheus.lib.utils import file_age
 
@@ -35,6 +37,10 @@ class UserRecordManager(object):
     def records(self):
         return self._records
 
+    @records.setter
+    def records(self, value):
+        self._records = value
+
     def create_user_record(self, user_name, data):
         record = UserRecord(user_name)
         self._set_iam_data(record, data)
@@ -45,15 +51,26 @@ class UserRecordManager(object):
         self._set_attached_policies(record)
         self._set_mfa_devices(record)
         self.records[user_name] = record
+        self.write_record_to_disk(record)
         return record
 
     def delete_user_record(self, user_name):
-        r = dict(self.records)
-        del r[user_name]
-        self._records = r
+        new_records = dict(self.records)
+        del new_records[user_name]
+        self.records = new_records
+        self.write_all_records_to_disk()
 
     def get_user_record(self, user_name):
-        return self._records.get(user_name)
+        record = self._records.get(user_name)
+        if record is None:
+            print("User account {} not found in data file".format(user_name))
+            print("Looking up account in IAM")
+            user_data = self.iam.get_user(user_name)
+            if not user_data:
+                print("... not found in IAM")
+            else:
+                record = self.create_user_record(user_name, user_data)
+        return record
 
     def load_data(self):
         if not os.path.exists(self.filename):
@@ -63,7 +80,7 @@ class UserRecordManager(object):
                     n = u.get('UserName')
                     print("Processing record: {}".format(n))
                     r = self.create_user_record(n, u)
-                    self.save_user_record(r)
+                    self.write_record_to_disk(r)
 
         if file_age(self.filename) > 2:
             print("Data file is more than 2 days old, consider refreshing.")
@@ -77,11 +94,20 @@ class UserRecordManager(object):
                 except EOFError:
                     break
 
-    def save_user_record(self, record):
+    def write_all_records_to_disk(self):
+        # replace data file with contents of new_records
+        with open(self.filename, 'wb') as f:
+            f.truncate()
+        with open(self.filename, 'ab') as f:
+            for k in self.records.keys():
+                pickle.dump(self.records[k], f)
+
+    def write_record_to_disk(self, record):
         with open(self.filename, 'ab') as f:
             pickle.dump(record, f)
 
-    def _set_iam_data(self, record, data):
+    @staticmethod
+    def _set_iam_data(record, data):
         """
         {
             Path: /,

@@ -58,13 +58,10 @@ def create(args):
         user_groups = iam.get_user_groups(args.username)
         for g in args.groups:
             if g in user_groups:
-                print("User is already a member of {}.".format(g))
+                print("User is already a member of {}".format(g))
             else:
                 iam.add_user_to_group(args.username, g)
-
-    # create user record and add to data file
-    record = urm.create_user_record(args.username, user_data)
-    urm.save_user_record(record)
+    urm.create_user_record(args.username, user_data)
 
 
 def delete(args):
@@ -72,16 +69,9 @@ def delete(args):
     urm = UserRecordManager().with_iam(iam)
     urm.load_data()
 
-    record = urm.records.get(args.username)
+    record = urm.get_user_record(args.username)
     if record is None:
-        print("User account {} not found in data file".format(args.username))
-        print("Looking up account in IAM")
-        user_data = iam.get_user(args.username)
-        if not user_data:
-            print("Account not found in IAM. Aborting")
-        else:
-            record = urm.create_user_record(args.username, user_data)
-
+        return
     assert isinstance(record, UserRecord)
 
     print("Deleting User Account: {}".format(args.username))
@@ -92,9 +82,8 @@ def delete(args):
     iam.detach_managed_policies(args.username, record.attached_policies)
     iam.delete_mfa_devices(args.username, record.mfa_devices)
     iam.delete_user(args.username)
-    # TODO - remove record from data file
     urm.delete_user_record(args.username)
-    print("... {} deleted.".format(args.username))
+    print("... {} deleted".format(args.username))
 
 
 def disable(args):
@@ -102,22 +91,15 @@ def disable(args):
     urm = UserRecordManager().with_iam(iam)
     urm.load_data()
 
-    record = urm.records.get(args.username)
+    record = urm.get_user_record(args.username)
     if record is None:
-        print("User account {} not found in data file".format(args.username))
-        print("Looking up account in IAM")
-        user_data = iam.get_user(args.username)
-        if not user_data:
-            print("Account not found in IAM. Aborting")
-        else:
-            record = urm.create_user_record(args.username, user_data)
-
+        return
     assert isinstance(record, UserRecord)
 
     print("Disabling User Account: {}".format(args.username))
     iam.deactivate_user_keys(args.username, record.access_keys)
     iam.delete_login_profile(args.username)
-    print("... {} disabled.".format(args.username))
+    print("... {} disabled".format(args.username))
 
 
 def init(args):

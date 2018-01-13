@@ -38,7 +38,7 @@ class IAMManager(object):
         """
         result = None
         if self.user_exists(user_name):
-            print("User already exists.".format(user_name))
+            print("User already exists".format(user_name))
         else:
             response = self.client.create_user(UserName=user_name)
             result = response.get('User')
