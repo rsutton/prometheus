@@ -222,13 +222,20 @@ class UserRecord(object):
     @property
     def last_activity(self):
         events = list()
+        # add account creation date
         events.append(self.iam_data.get('CreateDate'))
+
+        # last password usage
         d = self.password_last_used
         if d:
             events.append(self.password_last_used)
+
+        # last access key usage
         for k in self.access_keys:
             d = self.access_keys.get(k).get('LastUsedDate')
             if d:
                 events.append(d)
+
+        # return most recent
         events = sorted(events, reverse=True)
         return events[0]
