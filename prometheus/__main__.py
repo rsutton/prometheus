@@ -7,10 +7,10 @@ import sys
 
 from prometheus.lib.iam_manager import IAMManager
 from prometheus.lib.user_record import UserRecordManager, UserRecord
-
+from prometheus.__about__ import __version__
 
 def parse_args(args):
-    p = argparse.ArgumentParser(prog='Prometheus', description='AWS IAM Helper')
+    p = argparse.ArgumentParser(prog='Prometheus', description='AWS IAM Helper', add_help=True)
     subparsers = p.add_subparsers()
 
     parser_create = subparsers.add_parser('create', help='Create IAM User Account')
@@ -123,19 +123,20 @@ def report(args):
     urm.load_data()
     for k in urm.records.keys():
         r = urm.records[k]
-        # skip qtpi resources
-        if "test-App" in str(r.user_name) or "prod-App" in str(r.user_name):
-            continue
         delta = date.today() - r.last_activity.date()
         if delta.days > int(args.days):
             print("{}: {}".format(r.user_name, delta.days))
 
 
 def version(args):
-    from prometheus._version import __version__
     print("Prometheus version: {}".format(__version__))
 
 
 if __name__ == '__main__':
-    parser = parse_args(sys.argv[1:])
-    parser.func(parser)
+    args = ['-h'] if len(sys.argv[1:]) == 0 else sys.argv[1:]
+    parser = parse_args(args)
+    if hasattr(parser, 'func'):
+        parser.func(parser)
+    else:
+        print("Error parsing arguments.")
+

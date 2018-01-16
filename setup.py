@@ -1,23 +1,17 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
-exec(open('prometheus/_version.py').read())
+about = {}
+with open('prometheus/__about__.py') as fp:
+    exec(fp.read(), about)
 
 setup(
-    name="prometheus",
-    version=__version__,
-    description="AWS IAM Management Tool",
-    long_description=open("README.md").read(),
-    author="Ray Sutton",
-    author_email="ray.sutton@gmail.com",
-
-    data_files=[],
-
-    packages=find_packages(exclude=['tests*']),
-    package_data={'': ['templates/*']},
-
+    author=about['author'],
+    author_email=about['email'],
+    description=about['summary'],
     install_requires=['boto3', 'botocore'],
-    test_suite='nose.collector',
+    name=about['title'],
     tests_require=['nose', 'mock'],
-
-    include_package_data=True
+    test_suite='nose.collector',
+    url=about['uri'],
+    version=about['version'],
 )

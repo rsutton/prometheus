@@ -1,7 +1,6 @@
 import json
 import os.path
 import pickle
-import sys
 
 from prometheus.lib.iam_manager import IAMManager
 from prometheus.lib.utils import file_age
