@@ -7,7 +7,8 @@ import sys
 
 from prometheus.lib.iam_manager import IAMManager
 from prometheus.lib.user_record import UserRecordManager, UserRecord
-from prometheus.__about__ import __version__
+from __about__ import __version__
+
 
 def parse_args(args):
     p = argparse.ArgumentParser(prog='Prometheus', description='AWS IAM Helper', add_help=True)
@@ -139,4 +140,3 @@ if __name__ == '__main__':
         parser.func(parser)
     else:
         print("Error parsing arguments.")
-

@@ -1,7 +1,7 @@
 from setuptools import setup
 
 about = {}
-with open('prometheus/__about__.py') as fp:
+with open('__about__.py') as fp:
     exec(fp.read(), about)
 
 setup(
