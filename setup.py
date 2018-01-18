@@ -5,13 +5,14 @@ with open('prometheus/__about__.py') as fp:
     exec(fp.read(), about)
 
 setup(
-    author=about['author'],
-    author_email=about['email'],
-    description=about['summary'],
+    author=about['__author__'],
+    author_email=about['__email__'],
+    classifiers=about['__classifiers__'],
+    description=about['__summary__'],
     install_requires=['boto3', 'botocore'],
-    name=about['title'],
+    name=about['__title__'],
     tests_require=['nose', 'mock'],
     test_suite='nose.collector',
-    url=about['uri'],
-    version=about['version'],
+    url=about['__uri__'],
+    version=about['__version__'],
 )

@@ -15,6 +15,7 @@ import os.path
 __all__ = [
     "__title__", "__summary__", "__uri__", "__version__",
     "__author__", "__email__", "__license__", "__copyright__",
+    "__classifiers__"
 ]
 
 try:
@@ -30,3 +31,10 @@ __author__ = "Raymond Sutton"
 __email__ = "ray.sutton@gmail.com"
 __license__ = "Apache License, Version 2.0"
 __copyright__ = "2018 %s" % __author__
+__classifiers__=[
+    'Development Status :: 3 - Alpha',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: Apache Software License',
+    'Operating System :: POSIX :: Linux',
+    'Programming Language :: Python :: 3 :: Only'
+]
