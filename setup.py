@@ -1,18 +1,21 @@
 from setuptools import setup
 
-about = {}
-with open('__about__.py') as fp:
-    exec(fp.read(), about)
-
 setup(
-    author=about['__author__'],
-    author_email=about['__email__'],
-    classifiers=about['__classifiers__'],
-    description=about['__summary__'],
+    author='Raymond Sutton',
+    author_email='ray.sutton@gmail.com',
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: Apache Software License',
+        'Operating System :: POSIX :: Linux',
+        'Programming Language :: Python :: 3 :: Only'
+    ],
+    description='AWS IAM User Account Tool',
     install_requires=['boto3', 'botocore'],
-    name=about['__title__'],
+    license='Apache License, Version 2.0',
+    name='prometheus',
     tests_require=['nose', 'mock'],
     test_suite='nose.collector',
-    url=about['__uri__'],
-    version=about['__version__'],
+    url='https://github.com/rsutton/prometheus',
+    version='1.0.0-a0',
 )

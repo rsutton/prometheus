@@ -7,7 +7,6 @@ import sys
 
 from prometheus.lib.iam_manager import IAMManager
 from prometheus.lib.user_record import UserRecordManager, UserRecord
-from __about__ import __version__
 
 
 def parse_args(args):
@@ -37,9 +36,6 @@ def parse_args(args):
     parser_report = subparsers.add_parser('report', help='Aging Report')
     parser_report.add_argument('-d', dest='days', required=True, help='Inactive more than -d days')
     parser_report.set_defaults(func=report)
-
-    parser_version = subparsers.add_parser('version', help='Version')
-    parser_version.set_defaults(func=version)
 
     return p.parse_args(args)
 
@@ -127,10 +123,6 @@ def report(args):
         delta = date.today() - r.last_activity.date()
         if delta.days > int(args.days):
             print("{}: {}".format(r.user_name, delta.days))
-
-
-def version(args):
-    print("Prometheus version: {}".format(__version__))
 
 
 if __name__ == '__main__':
