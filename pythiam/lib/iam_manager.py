@@ -1,5 +1,5 @@
 import boto3
-from prometheus.lib.decorators import boto3_client
+from pythiam.lib.decorators import boto3_client
 
 
 class IAMManager(object):

@@ -2,8 +2,8 @@ import json
 import os.path
 import pickle
 
-from prometheus.lib.iam_manager import IAMManager
-from prometheus.lib.utils import file_age
+from pythiam.lib.iam_manager import IAMManager
+from pythiam.lib.utils import file_age
 
 
 class UserRecordManager(object):

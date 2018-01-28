@@ -5,12 +5,12 @@ from shutil import copyfile
 
 import sys
 
-from prometheus.lib.iam_manager import IAMManager
-from prometheus.lib.user_record import UserRecordManager, UserRecord
+from pythiam.lib.iam_manager import IAMManager
+from pythiam.lib.user_record import UserRecordManager, UserRecord
 
 
 def parse_args(args):
-    p = argparse.ArgumentParser(prog='Prometheus', description='AWS IAM Helper', add_help=True)
+    p = argparse.ArgumentParser(prog='pythiam', description='AWS IAM Helper', add_help=True)
     subparsers = p.add_subparsers()
 
     parser_create = subparsers.add_parser('create', help='Create IAM User Account')
