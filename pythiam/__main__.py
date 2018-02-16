@@ -10,13 +10,14 @@ from pythiam.lib.user_record import UserRecordManager, UserRecord
 
 
 def parse_args(args):
-    p = argparse.ArgumentParser(prog='pythiam', description='AWS IAM Helper', add_help=True)
-    subparsers = p.add_subparsers()
+    parser = argparse.ArgumentParser(prog='pythiam', description='AWS IAM Helper', add_help=True)
+    subparsers = parser.add_subparsers()
 
     parser_create = subparsers.add_parser('create', help='Create IAM User Account')
     parser_create.set_defaults(func=create)
     parser_create.add_argument('-u', dest='username', required=True, help='IAM User name')
-    parser_create.add_argument('-g', dest='groups', action='append', help='Use multiple -g for multiple Groups')
+    parser_create.add_argument('-g', dest='groups', action='append',
+                               help='Use multiple -g for multiple Groups')
     parser_create.add_argument('-k', dest='with_key', action='store_true', help='Create Access Key')
 
     parser_delete = subparsers.add_parser('delete', help='Delete IAM User Account')
@@ -37,7 +38,7 @@ def parse_args(args):
     parser_report.add_argument('-d', dest='days', required=True, help='Inactive more than -d days')
     parser_report.set_defaults(func=report)
 
-    return p.parse_args(args)
+    return parser.parse_args(args)
 
 
 def create(args):
@@ -53,11 +54,11 @@ def create(args):
 
     if args.groups is not None:
         user_groups = iam.get_user_groups(args.username)
-        for g in args.groups:
-            if g in user_groups:
-                print("User is already a member of {}".format(g))
+        for group in args.groups:
+            if group in user_groups:
+                print("User is already a member of {}".format(group))
             else:
-                iam.add_user_to_group(args.username, g)
+                iam.add_user_to_group(args.username, group)
     urm.create_user_record(args.username, user_data)
 
 
@@ -99,7 +100,7 @@ def disable(args):
     print("... {} disabled".format(args.username))
 
 
-def init(args):
+def init():
     urm = UserRecordManager()
     urm.load_data()
     if os.path.exists(urm.filename):
@@ -108,7 +109,7 @@ def init(args):
     urm.load_data()
 
 
-def list_users(args):
+def list_users():
     urm = UserRecordManager()
     urm.load_data()
     for k in urm.records.keys():
@@ -119,16 +120,20 @@ def report(args):
     urm = UserRecordManager()
     urm.load_data()
     for k in urm.records.keys():
-        r = urm.records[k]
-        delta = date.today() - r.last_activity.date()
+        record = urm.records[k]
+        delta = date.today() - record.last_activity.date()
         if delta.days > int(args.days):
-            print("{}: {}".format(r.user_name, delta.days))
+            print("{}: {}".format(record.user_name, delta.days))
 
 
-if __name__ == '__main__':
-    args = ['-h'] if len(sys.argv[1:]) == 0 else sys.argv[1:]
+def main():
+    num_of_args = len(sys.argv[1:])
+    args = ['-h'] if num_of_args == 0 else sys.argv[1:]
     parser = parse_args(args)
     if hasattr(parser, 'func'):
         parser.func(parser)
     else:
         print("Error parsing arguments.")
+
+if __name__ == '__main__':
+    main()
