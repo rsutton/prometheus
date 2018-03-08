@@ -100,7 +100,7 @@ def disable(args):
     print("... {} disabled".format(args.username))
 
 
-def init():
+def init(args):
     urm = UserRecordManager()
     urm.load_data()
     if os.path.exists(urm.filename):
@@ -109,7 +109,7 @@ def init():
     urm.load_data()
 
 
-def list_users():
+def list_users(args):
     urm = UserRecordManager()
     urm.load_data()
     for k in urm.records.keys():
